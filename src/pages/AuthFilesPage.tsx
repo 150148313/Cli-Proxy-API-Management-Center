@@ -45,6 +45,7 @@ import { AuthFilesPrefixProxyEditorModal } from '@/features/authFiles/components
 import { OAuthExcludedCard } from '@/features/authFiles/components/OAuthExcludedCard';
 import { OAuthModelAliasCard } from '@/features/authFiles/components/OAuthModelAliasCard';
 import { useAuthFilesData } from '@/features/authFiles/hooks/useAuthFilesData';
+import { useAuthFilesCleanup } from '@/features/authFiles/hooks/useAuthFilesCleanup';
 import { useAuthFilesModels } from '@/features/authFiles/hooks/useAuthFilesModels';
 import { useAuthFilesOauth } from '@/features/authFiles/hooks/useAuthFilesOauth';
 import { useAuthFilesPrefixProxyEditor } from '@/features/authFiles/hooks/useAuthFilesPrefixProxyEditor';
@@ -164,6 +165,12 @@ export function AuthFilesPage() {
     disableControls: connectionStatus !== 'connected',
     loadFiles,
     loadKeyStats: refreshKeyStats,
+  });
+
+  const { cleanup401Loading, handleCleanup401 } = useAuthFilesCleanup({
+    disableControls: connectionStatus !== 'connected',
+    loadFiles,
+    refreshKeyStats,
   });
 
   const disableControls = connectionStatus !== 'connected';
@@ -621,6 +628,17 @@ export function AuthFilesPage() {
               loading={uploading}
             >
               {t('auth_files.upload_button')}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => {
+                void handleCleanup401();
+              }}
+              disabled={disableControls || loading || cleanup401Loading}
+              loading={cleanup401Loading}
+            >
+              {t('auth_files.cleanup_401_button')}
             </Button>
             <Button
               variant="danger"

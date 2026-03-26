@@ -8,6 +8,10 @@ import {
   GEMINI_CLI_CONFIG,
   KIMI_CONFIG
 } from '@/components/quota';
+import {
+  deleteAuthFilesAndRefresh,
+  shouldAutoDeleteAuthFileOnQuotaError
+} from '@/components/quota/quotaAutoDelete';
 import { useNotificationStore, useQuotaStore } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
@@ -65,6 +69,7 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     const config = getQuotaConfig(quotaType) as unknown as {
       i18nPrefix: string;
       fetchQuota: (file: AuthFileItem, t: TFunction) => Promise<unknown>;
+      autoDeleteOnErrorStatuses?: readonly number[];
       buildLoadingState: () => unknown;
       buildSuccessState: (data: unknown) => unknown;
       buildErrorState: (message: string, status?: number) => unknown;
@@ -86,6 +91,26 @@ export function AuthFileQuotaSection(props: AuthFileQuotaSectionProps) {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('common.unknown_error');
       const status = getStatusFromError(err);
+      if (shouldAutoDeleteAuthFileOnQuotaError(status, config.autoDeleteOnErrorStatuses)) {
+        try {
+          showNotification(t('auth_files.quota_auto_delete_single', { name: file.name }), 'warning');
+          const deletedNames = await deleteAuthFilesAndRefresh([file.name]);
+          if (!deletedNames.has(file.name)) {
+            throw new Error(t('notification.delete_failed'));
+          }
+          updateQuotaState((prev: Record<string, unknown>) => {
+            const next = { ...prev };
+            delete next[file.name];
+            return next;
+          });
+        } catch (deleteErr: unknown) {
+          const deleteMessage =
+            deleteErr instanceof Error ? deleteErr.message : t('notification.delete_failed');
+          showNotification(`${t('notification.delete_failed')}: ${deleteMessage}`, 'error');
+        }
+        return;
+      }
+
       updateQuotaState((prev: Record<string, unknown>) => ({
         ...prev,
         [file.name]: config.buildErrorState(message, status)

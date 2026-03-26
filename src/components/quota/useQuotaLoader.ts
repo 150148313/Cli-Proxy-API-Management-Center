@@ -5,9 +5,10 @@
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AuthFileItem } from '@/types';
-import { useQuotaStore } from '@/stores';
+import { useNotificationStore, useQuotaStore } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import type { QuotaConfig } from './quotaConfigs';
+import { deleteAuthFilesAndRefresh, shouldAutoDeleteAuthFileOnQuotaError } from './quotaAutoDelete';
 
 type QuotaScope = 'page' | 'all';
 
@@ -25,6 +26,7 @@ interface LoadQuotaResult<TData> {
 
 export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>) {
   const { t } = useTranslation();
+  const showNotification = useNotificationStore((state) => state.showNotification);
   const quota = useQuotaStore(config.storeSelector);
   const setQuota = useQuotaStore((state) => state[config.storeSetter]) as QuotaSetter<
     Record<string, TState>
@@ -67,12 +69,36 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
             }
           })
         );
-
         if (requestId !== requestIdRef.current) return;
+
+        const namesToAutoDelete =
+          results
+            .filter(
+              (result) =>
+                result.status === 'error' &&
+                shouldAutoDeleteAuthFileOnQuotaError(
+                  result.errorStatus,
+                  config.autoDeleteOnErrorStatuses
+                )
+            )
+            .map((result) => result.name);
+        if (namesToAutoDelete.length > 0) {
+          showNotification(
+            namesToAutoDelete.length === 1
+              ? t('auth_files.quota_auto_delete_single', { name: namesToAutoDelete[0] })
+              : t('auth_files.quota_auto_delete_multiple', { count: namesToAutoDelete.length }),
+            'warning'
+          );
+        }
+        const deletedNames = await deleteAuthFilesAndRefresh(namesToAutoDelete);
 
         setQuota((prev) => {
           const nextState = { ...prev };
           results.forEach((result) => {
+            if (deletedNames.has(result.name)) {
+              delete nextState[result.name];
+              return;
+            }
             if (result.status === 'success') {
               nextState[result.name] = config.buildSuccessState(result.data as TData);
             } else {
@@ -91,7 +117,7 @@ export function useQuotaLoader<TState, TData>(config: QuotaConfig<TState, TData>
         }
       }
     },
-    [config, setQuota, t]
+    [config, setQuota, showNotification, t]
   );
 
   return { quota, loadQuota };

@@ -3,12 +3,22 @@
  */
 
 import { apiClient } from './client';
-import type { AuthFilesResponse } from '@/types/authFile';
+import type { AuthFilesCleanupResponse, AuthFilesResponse } from '@/types/authFile';
 import type { OAuthModelAliasEntry } from '@/types';
 
 type StatusError = { status?: number };
 type AuthFileStatusResponse = { status: string; disabled: boolean };
 type AuthFileEntry = AuthFilesResponse['files'][number];
+type AuthFilesCleanupFailedItemWire = { name?: unknown; error?: unknown };
+type AuthFilesCleanupResponseWire = {
+  status?: unknown;
+  matched?: unknown;
+  deleted?: unknown;
+  files?: unknown;
+  failed?: unknown;
+  dry_run?: unknown;
+  dryRun?: unknown;
+};
 
 export const AUTH_FILE_INVALID_JSON_OBJECT_ERROR = 'AUTH_FILE_INVALID_JSON_OBJECT';
 
@@ -134,6 +144,46 @@ const dedupeAuthFilesResponse = (payload: AuthFilesResponse): AuthFilesResponse 
   };
 };
 
+const normalizeAuthFilesCleanupResponse = (
+  payload: AuthFilesCleanupResponseWire | null | undefined
+): AuthFilesCleanupResponse => {
+  const files = Array.isArray(payload?.files)
+    ? payload.files
+        .map((entry) => String(entry ?? '').trim())
+        .filter(Boolean)
+    : [];
+
+  const failed = Array.isArray(payload?.failed)
+    ? payload.failed
+        .map((entry) => {
+          const item = (entry ?? {}) as AuthFilesCleanupFailedItemWire;
+          const name = String(item.name ?? '').trim();
+          const error = String(item.error ?? '').trim();
+          if (!name) return null;
+          return { name, error };
+        })
+        .filter((entry): entry is { name: string; error: string } => entry !== null)
+    : [];
+
+  const matched =
+    typeof payload?.matched === 'number' && Number.isFinite(payload.matched)
+      ? payload.matched
+      : files.length + failed.length;
+  const deleted =
+    typeof payload?.deleted === 'number' && Number.isFinite(payload.deleted)
+      ? payload.deleted
+      : files.length;
+
+  return {
+    status: typeof payload?.status === 'string' ? payload.status : undefined,
+    matched,
+    deleted,
+    files,
+    failed,
+    dryRun: payload?.dry_run === true || payload?.dryRun === true,
+  };
+};
+
 const parseAuthFileJsonObject = (rawText: string): Record<string, unknown> => {
   const trimmed = rawText.trim();
 
@@ -248,6 +298,14 @@ const OAUTH_MODEL_ALIAS_ENDPOINT = '/oauth-model-alias';
 
 export const authFilesApi = {
   list: async () => dedupeAuthFilesResponse(await apiClient.get<AuthFilesResponse>('/auth-files')),
+
+  cleanup401: async (dryRun = false) =>
+    normalizeAuthFilesCleanupResponse(
+      await apiClient.post<AuthFilesCleanupResponseWire>('/auth-files/cleanup', {
+        match: { last_error_http_status: 401 },
+        dry_run: dryRun,
+      })
+    ),
 
   setStatus: (name: string, disabled: boolean) =>
     apiClient.patch<AuthFileStatusResponse>('/auth-files/status', { name, disabled }),

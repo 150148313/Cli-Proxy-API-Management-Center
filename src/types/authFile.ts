@@ -28,9 +28,25 @@ export interface AuthFileItem {
   unavailable?: boolean;
   status?: string;
   statusMessage?: string;
+  lastErrorHttpStatus?: number | null;
+  lastErrorMessage?: string;
   lastRefresh?: string | number;
   modified?: number;
   [key: string]: unknown;
+}
+
+export interface AuthFilesCleanupFailedItem {
+  name: string;
+  error: string;
+}
+
+export interface AuthFilesCleanupResponse {
+  status?: string;
+  matched: number;
+  deleted: number;
+  files: string[];
+  failed: AuthFilesCleanupFailedItem[];
+  dryRun: boolean;
 }
 
 export interface AuthFilesResponse {

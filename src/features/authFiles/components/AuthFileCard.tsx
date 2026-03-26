@@ -92,7 +92,6 @@ export function AuthFileCard(props: AuthFileCardProps) {
     quotaFilterType && resolveQuotaType(file) === quotaFilterType ? quotaFilterType : null;
 
   const showQuotaLayout = Boolean(quotaType) && !isRuntimeOnly && !compact;
-
   const providerCardClass =
     quotaType === 'antigravity'
       ? styles.antigravityCard
