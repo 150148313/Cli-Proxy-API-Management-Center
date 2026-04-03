@@ -448,6 +448,7 @@
     "description": "Manage all CLI Proxy JSON auth files here (e.g. Qwen, Gemini, Vertex). Uploading a credential immediately enables the corresponding AI integration.",
     "upload_button": "Upload File",
     "delete_all_button": "Delete All",
+    "delete_current_page_button": "Delete Current Page",
     "empty_title": "No Auth Files",
     "empty_desc": "Click the button above to upload the first file",
     "search_empty_title": "No matching files",

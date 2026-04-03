@@ -656,6 +656,14 @@ export function AuthFilesPage() {
             >
               {deleteAllButtonLabel}
             </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => batchDelete(selectablePageItems.map((file) => file.name))}
+              disabled={disableControls || loading || selectablePageItems.length === 0}
+            >
+              {t('auth_files.delete_current_page_button')}
+            </Button>
             <input
               ref={fileInputRef}
               type="file"
